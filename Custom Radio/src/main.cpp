@@ -90,6 +90,16 @@ int quest(){
   return 1; // se completo el escape exitosamente.
 }
 void quest_FAILED(void){
+  /*
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Se acabo la Bateria,");
+  lcd.setCursor(0,1);
+  lcd.print("Quedaron atrapados!");
+  delay(10000);
+  */
+  parpadear_backlight();
+  parpadear_backlight();
   parpadear_backlight();
   parpadear_backlight();
   for(;;){
@@ -124,8 +134,13 @@ void init_gpio(void){
 bool bateria_restante(void){ // funciona 9, quizas se pierde un minuto por los delays.
   if(rtc.getSecond() == 00 ){ // modifica el porcentaje de bateria cada 1 min.
     bateria--;
-    lcd.setCursor(17,3);
-    lcd.print(bateria);
+    if(bateria < 10){
+      lcd.setCursor(17,3); lcd.print(" ");
+      lcd.print(bateria);
+    }
+    else {
+      lcd.setCursor(17,3); lcd.print(bateria);
+    }
     if(bateria == 0){
       return true;
     }
