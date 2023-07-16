@@ -5,7 +5,7 @@
 
 
 int perilla_superior = 19;
-int circuito_electrico = 17; // combinacion de jacks.
+int circuito_electrico = 13; // combinacion de jacks. estaba en el 17 y no funcionaba, se cambio al 13 para probar...
 int adc_1 = 4; // combinacion de frecuencias de fichas.
 int adc_2 = 2;
 int boton_final = 18;
@@ -59,12 +59,24 @@ int quest(){
     }
   }parpadear_backlight();
 
+  /*
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
   lcd.setCursor(0,0); lcd.print("Configurar  Circuito"); 
-  lcd.setCursor(0,1); lcd.print("      Eléctrico     ");
+  lcd.setCursor(0,1); lcd.print("      Electrico     ");
+  
+  for(;digitalRead(circuito_electrico) == LOW;){ // cambiar low a high.
+    if (bateria_restante() == true){
+    return 2; // se agoto el tiempo/ bateria.
+    }
+  }parpadear_backlight();
+  */
 
-  for(;digitalRead(circuito_electrico) == HIGH;){ // cambiar low a high.
+  lcd.setCursor(0,0); lcd.print("                    ");
+  lcd.setCursor(0,1); lcd.print("                    ");
+  lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
+  lcd.setCursor(0,1); lcd.print("      Latitud       "); 
+  for(; analogRead(adc_1) < 500 && analogRead(adc_1) > 750;){
     if (bateria_restante() == true){
     return 2; // se agoto el tiempo/ bateria.
     }
@@ -72,12 +84,14 @@ int quest(){
 
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
-  lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas"); 
-  for(; 1900 <= analogRead(adc_1) <= 2350  &&  150 <= analogRead(adc_2) <= 520;){
+  lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
+  lcd.setCursor(0,1); lcd.print("      Longitud      "); 
+  for(;analogRead(adc_2) < 2600 && analogRead(adc_2) > 2700;){
     if (bateria_restante() == true){
     return 2; // se agoto el tiempo/ bateria.
     }
   }parpadear_backlight();
+
 
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
@@ -125,11 +139,11 @@ void parpadear_backlight(void){
   delay(100);
 }
 void init_gpio(void){
-  pinMode(perilla_superior, INPUT);
+  pinMode(perilla_superior, INPUT_PULLDOWN);
   pinMode(circuito_electrico,INPUT);
   //pinMode(adc_1, INPUT);
   //pinMode(adc_2,INPUT);
-  pinMode(boton_final,INPUT);
+  pinMode(boton_final,INPUT_PULLDOWN);
 }
 bool bateria_restante(void){ // funciona 9, quizas se pierde un minuto por los delays.
   if(rtc.getSecond() == 00 ){ // modifica el porcentaje de bateria cada 1 min.
