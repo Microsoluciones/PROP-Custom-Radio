@@ -6,8 +6,8 @@
 
 int perilla_superior = 19;
 int circuito_electrico = 13; // combinacion de jacks. estaba en el 17 y no funcionaba, se cambio al 13 para probar...
-int adc_1 = 4; // combinacion de frecuencias de fichas.
-int adc_2 = 2;
+int adc_lat = 4; // combinacion de frecuencias de fichas.
+int adc_lon = 2;
 int boton_final = 18;
 
 int lcdColumns = 20;
@@ -48,50 +48,83 @@ void loop() {
       break;
   }
 }
+bool medida_adc_lat (void){
+  while (true){
+    int valor_adc = analogRead(adc_lat);
 
+    if(valor_adc >= 15 && valor_adc <= 780) {
+        return 0;
+    }else{
+      if (bateria_restante() == true){
+      return 1; // se agoto el tiempo/ bateria.
+      }
+    }
+  }
+}
+
+bool medida_adc_lon (void){
+  while (true){
+    int valor_adc = analogRead(adc_lon);
+
+    if(valor_adc <= 2400 && valor_adc >= 1850) {
+        return 0;
+    }else{
+      if (bateria_restante() == true){
+      return 1; // se agoto el tiempo/ bateria.
+      }
+    }
+  }
+}
+
+bool espera_valores_en_rango() {
+    while (true) {
+        int latitud = medida_adc_lat();
+        int longitud = medida_adc_lon();
+
+        if (latitud == 0 && longitud == 0) {
+            // Ambos valores están dentro del rango, puedes continuar.
+            return true;
+        }
+
+        if (latitud == 2 || longitud == 2) {
+            // Se agotó la batería durante la espera.
+            return false;
+        }
+    }
+}
 int quest(){
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
   lcd.setCursor(0,0); lcd.print("   Iniciar Sistema  ");
+  
+  
   for(;digitalRead(perilla_superior) == HIGH;){ // cambiar low a high.
     if (bateria_restante() == true){
     return 2; // se agoto el tiempo/ bateria.
     }
   }parpadear_backlight();
-
-  /*
+  
+  
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
   lcd.setCursor(0,0); lcd.print("Configurar  Circuito"); 
   lcd.setCursor(0,1); lcd.print("      Electrico     ");
   
-  for(;digitalRead(circuito_electrico) == LOW;){ // cambiar low a high.
+  for(;digitalRead(circuito_electrico) == HIGH;){ // cambiar low a high.
     if (bateria_restante() == true){
     return 2; // se agoto el tiempo/ bateria.
     }
   }parpadear_backlight();
-  */
+
 
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
   lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
-  lcd.setCursor(0,1); lcd.print("      Latitud       "); 
-  for(; analogRead(adc_1) < 500 && analogRead(adc_1) > 750;){
-    if (bateria_restante() == true){
-    return 2; // se agoto el tiempo/ bateria.
-    }
-  }parpadear_backlight();
+  lcd.setCursor(0,1); lcd.print(" Latitud y longitud "); 
 
-  lcd.setCursor(0,0); lcd.print("                    ");
-  lcd.setCursor(0,1); lcd.print("                    ");
-  lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
-  lcd.setCursor(0,1); lcd.print("      Longitud      "); 
-  for(;analogRead(adc_2) < 2600 && analogRead(adc_2) > 2700;){
-    if (bateria_restante() == true){
-    return 2; // se agoto el tiempo/ bateria.
-    }
-  }parpadear_backlight();
-
+  if (espera_valores_en_rango() == true){
+    parpadear_backlight();
+  }
 
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
@@ -103,15 +136,8 @@ int quest(){
   }parpadear_backlight();
   return 1; // se completo el escape exitosamente.
 }
+
 void quest_FAILED(void){
-  /*
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Se acabo la Bateria,");
-  lcd.setCursor(0,1);
-  lcd.print("Quedaron atrapados!");
-  delay(10000);
-  */
   parpadear_backlight();
   parpadear_backlight();
   parpadear_backlight();
