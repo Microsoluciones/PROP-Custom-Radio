@@ -60,20 +60,7 @@ void rfControllerTask(void *pvParameters) {
 void mainTask(void *pvParameters) {
     MainTaskMsg msg;
     pinMode(LED_BUILTIN, OUTPUT);
-
-    while (1) {
-        if (xQueueReceive(mainTaskQueue, &msg, portMAX_DELAY) == pdTRUE) {
-            if (msg.type == SHORT_PRESS) {
-                blinkBuiltinLED(1,50);
-                rainbowTest(1,50);
-            } else if (msg.type == LONG_PRESS) {
-                blinkBuiltinLED(2,250);
-                rainbowTest(2,250);
-            }
-        }
-        
-        sr.setAllLow();
-    }
+    
 }
 
 

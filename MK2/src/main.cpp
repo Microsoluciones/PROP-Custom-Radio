@@ -15,14 +15,17 @@ DFRobotDFPlayerMini myDFPlayer;
 PCF8574 pcf(0x20);
 volatile unsigned long pressStart[4] = {0, 0, 0, 0};
 volatile bool pressed[4] = {false, false, false, false};
+LiquidCrystal_I2C lcd(0x27, 20, 4); // Adjust address and size as needed
 
 void setup() {
     Serial.begin(115200);
     Serial.println("Setup started");
-    sr.setAllLow();
-    gpio_declarations();
-
+    sr.setAllHigh(); Serial.println("Shift Register cleared");
+    gpio_declarations(); Serial.println("GPIOs initialized");
     Wire.begin(21, 22); // or your actual SDA, SCL pins
+    // for hat
+    /*-----------------------------------------------------------------
+    
     if (!pcf.begin()) {
         Serial.println("PCF8574 not found!");
     } else {
@@ -30,9 +33,13 @@ void setup() {
         // After successful I2C init
         sr.set(LED_I2C, HIGH);
     }
-
+    -----------------------------------------------------------------*/
+    // for display
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(0, 0); lcd.print("Initializing...");
+    //-----------------------------------------------------------------
     myDFPlayerSerial.begin(9600, SERIAL_8N1, 16, 17);
-    // Serial.println("DFPlayer Mini test");
     if (!myDFPlayer.begin(myDFPlayerSerial)) {
         Serial.println("Unable to begin DFPlayer Mini:\n"
                         "Check SD card.\n"

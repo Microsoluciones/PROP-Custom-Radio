@@ -3,6 +3,8 @@
 #include <ShiftRegister74HC595.h>
 #include <DFRobotDFPlayerMini.h>
 #include <PCF8574.h>
+#include <LiquidCrystal_I2C.h>
+
 #define led_BUILTIN 2 // Define the built-in LED pin
 
 extern const int rfPins[4];
@@ -13,6 +15,7 @@ extern ShiftRegister74HC595<2> sr;
 extern HardwareSerial myDFPlayerSerial;
 extern DFRobotDFPlayerMini myDFPlayer;
 extern PCF8574 pcf;
+extern LiquidCrystal_I2C lcd;
 
 enum RfEventType { SHORT_PRESS, LONG_PRESS };
 struct RfEvent {
