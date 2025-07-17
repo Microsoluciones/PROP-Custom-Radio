@@ -6,6 +6,19 @@
 #include <LiquidCrystal_I2C.h>
 
 #define led_BUILTIN 2 // Define the built-in LED pin
+#define buzzer 2
+/*----------Digital GPIOs pins----------*/
+#define digital_GPIO1 13
+#define digital_GPIO2 14
+#define digital_GPIO3 27
+#define digital_GPIO4 26
+#define digital_GPIO5 33
+#define digital_GPIO6 32
+/*----------Analog Input pins----------*/
+#define analog_input1 34
+#define analog_input2 35
+#define analog_input3 36
+#define analog_input4 39
 
 extern const int rfPins[4];
 extern const unsigned long LONG_PRESS_MS;

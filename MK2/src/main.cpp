@@ -17,10 +17,11 @@ volatile unsigned long pressStart[4] = {0, 0, 0, 0};
 volatile bool pressed[4] = {false, false, false, false};
 LiquidCrystal_I2C lcd(0x27, 20, 4); // Adjust address and size as needed
 
+
 void setup() {
     Serial.begin(115200);
     Serial.println("Setup started");
-    sr.setAllHigh(); Serial.println("Shift Register cleared");
+    sr.setAllLow(); Serial.println("Shift Register cleared");
     gpio_declarations(); Serial.println("GPIOs initialized");
     Wire.begin(21, 22); // or your actual SDA, SCL pins
     // for hat

@@ -31,6 +31,15 @@ esp_err_t gpio_declarations(void) {
   attachInterrupt(digitalPinToInterrupt(rfPins[2]), rf_isr2, CHANGE);
   attachInterrupt(digitalPinToInterrupt(rfPins[3]), rf_isr3, CHANGE);
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+  
+  /*----------custom declarations----------*/
+  pinMode(digital_GPIO1, INPUT);
+  pinMode(digital_GPIO2, INPUT);
+  pinMode(digital_GPIO3, INPUT);
+  pinMode(digital_GPIO4, INPUT);
+  pinMode(digital_GPIO5, INPUT);
+  pinMode(digital_GPIO6, INPUT);
   return ESP_OK;
 }
 
