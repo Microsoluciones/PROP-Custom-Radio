@@ -31,6 +31,7 @@ extern HardwareSerial myDFPlayerSerial;
 extern DFRobotDFPlayerMini myDFPlayer;
 extern PCF8574 pcf;
 extern LiquidCrystal_I2C lcd;
+extern bool lastQuestSuccess;
 
 enum RfEventType { SHORT_PRESS, LONG_PRESS };
 enum MainTaskMsgType { BUTTON_EVENT, PREPARATION_READY, QUEST_COMPLETED, CONSEQUENCE_COMPLETED, RESTART_REQUESTED, QUEST_FAILED };

@@ -18,6 +18,7 @@ PCF8574 pcf(0x20);
 volatile unsigned long pressStart[4] = {0, 0, 0, 0};
 volatile bool pressed[4] = {false, false, false, false};
 LiquidCrystal_I2C lcd(0x27, 20, 4); // Adjust address and size as needed
+bool lastQuestSuccess = false;
 
 
 int bateria = 15; // Example initial value, adjust as needed

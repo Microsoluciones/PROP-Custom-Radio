@@ -89,6 +89,10 @@ void mainTask(void *pvParameters) {
             // Start consequence task and STORE THE HANDLE
             if (msg.msgType == QUEST_COMPLETED || msg.msgType == QUEST_FAILED) {
                 Serial.println("Quest ended, starting consequence task");
+                
+                // Store the quest result globally
+                lastQuestSuccess = (msg.msgType == QUEST_COMPLETED);
+                
                 clearQueue(mainTaskQueue); // Clear any pending messages
                 xTaskCreatePinnedToCore(consequenceTask, "Consequence Task", 2048, NULL, 1, &consequenceTaskHandle, 1);
             }
@@ -134,7 +138,7 @@ void preparationTask(void *pvParameters) {
 
 void questTask(void *pvParameters) {
     MainTaskMsg msg;
-    const unsigned long QUEST_TIME_MS = bateria * 60 * 1000; // 15 minutes
+    const unsigned long QUEST_TIME_MS = bateria * 60 * 1000; // Battery minutes in milliseconds
     unsigned long startTime = millis();
     bool questFinished = false;
     int step = 0;
@@ -152,7 +156,19 @@ void questTask(void *pvParameters) {
         lcd.setCursor(17, 3);
         lcd.print(":   ");
         lcd.setCursor(17, 3);
-        lcd.print(remaining / 60000); lcd.print("%");
+        lcd.print(remaining / 60000); // Show minutes remaining
+        
+        // Check for timeout FIRST
+        if (remaining == 0) {
+            Serial.println("Quest time expired - QUEST FAILED");
+            // Send QUEST_FAILED message to mainTask ONLY
+            msg.msgType = QUEST_FAILED;
+            xQueueSend(mainTaskQueue, &msg, 0);
+            // Do NOT send to questTaskQueue
+            vTaskDelete(NULL);
+            return; // Exit task
+        }
+        
         // Check for skip or end messages
         if (xQueueReceive(questTaskQueue, &msg, 10/portTICK_PERIOD_MS) == pdTRUE) {
             if (msg.channel == 1 && msg.type == LONG_PRESS) {
@@ -166,30 +182,20 @@ void questTask(void *pvParameters) {
                     Serial.println("Quest completed successfully");
                     msg.msgType = QUEST_COMPLETED;
                     xQueueSend(mainTaskQueue, &msg, 0);
-                    xQueueSend(questTaskQueue, &msg, 0); // Notify questTaskQueue
+                    // Do NOT send to questTaskQueue
                     vTaskDelete(NULL); // Exit task
+                    return;
                 }
             } else if (msg.channel == 2 && msg.type == LONG_PRESS) {
-                Serial.println("Quest time expired - QUEST FAILED");
-                // Send QUEST_FAILED message to mainTask
+                Serial.println("Quest manually failed - QUEST FAILED");
+                // Send QUEST_FAILED message to mainTask ONLY
                 msg.msgType = QUEST_FAILED;
                 xQueueSend(mainTaskQueue, &msg, 0);
-                xQueueSend(questTaskQueue, &msg, 0); // Notify questTaskQueue
+                // Do NOT send to questTaskQueue
                 vTaskDelete(NULL);
                 return; // Exit task
-                break;
             }
         }
-        if (remaining == 0) {
-            Serial.println("Quest time expired - QUEST FAILED");
-            // Send QUEST_FAILED message to mainTask
-            msg.msgType = QUEST_FAILED;
-            xQueueSend(mainTaskQueue, &msg, 0);
-            xQueueSend(questTaskQueue, &msg, 0); // Notify questTaskQueue
-            vTaskDelete(NULL);
-            return; // Exit task
-        }
-
         switch (step) {
             case 0: // Step 1: llave_sistema to GND
                 lcd.setCursor(0,0); lcd.print("   Iniciar Sistema  ");
@@ -238,9 +244,10 @@ void questTask(void *pvParameters) {
         }
     }
 
+    // Natural completion
     msg.msgType = QUEST_COMPLETED;
     xQueueSend(mainTaskQueue, &msg, 0);
-    xQueueSend(questTaskQueue, &msg, 0); // Notify questTaskQueue
+    // Do NOT send to questTaskQueue
     vTaskDelete(NULL);
 }
 
@@ -249,18 +256,28 @@ void consequenceTask(void *pvParameters) {
     MainTaskMsg msg;
     lcd.clear();    
     
-    // The quest result is passed via a parameter or global variable
-    // For now, assume quest was successful (you can modify this)
-    parpadear_backlight();
-    lcd.clear(); lcd.setCursor(0,0); 
-    lcd.print("  Mision Cumplida!  ");
-
-    // Simple scrolling - if task gets deleted, it stops
-    for(int i = 0; i < 3 ; i++){
-        scrollText(1, "Muy Bien Equipo! ", 500, 20);
-        vTaskDelay(100/portTICK_PERIOD_MS); // Small delay between scrolls
+    if (lastQuestSuccess) {
+        // Success sequence (same as before)
+        parpadear_backlight();
+        lcd.clear(); lcd.setCursor(0,0); 
+        lcd.print("  Mision Cumplida!  ");
+        for(int i = 0; i < 3 ; i++){
+            scrollText(1, "Muy Bien Equipo! ", 500, 20);
+            vTaskDelay(100/portTICK_PERIOD_MS);
+        }
+    } else {
+        // Failure sequence
+        for(int i = 0; i < 5; i++) {
+            parpadear_backlight();
+            vTaskDelay(200/portTICK_PERIOD_MS);
+        }
+        lcd.noBacklight();
+        lcd.clear();
+        //lcd.setCursor(0,0); lcd.print("   Mision Fallida   ");
+        //lcd.setCursor(0,1); lcd.print("   Tiempo Agotado   ");
+        vTaskDelay(20000/portTICK_PERIOD_MS);
     }
-    // Notify mainTask that consequence is complete
+    
     msg.msgType = CONSEQUENCE_COMPLETED;
     xQueueSend(mainTaskQueue, &msg, 0);
     consequenceTaskHandle = NULL;
