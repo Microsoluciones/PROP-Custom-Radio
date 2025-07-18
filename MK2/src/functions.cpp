@@ -32,7 +32,7 @@ esp_err_t gpio_declarations(void) {
   attachInterrupt(digitalPinToInterrupt(rfPins[3]), rf_isr3, CHANGE);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(buzzer, OUTPUT);
-  
+
   /*----------custom declarations----------*/
   pinMode(digital_GPIO1, INPUT);
   pinMode(digital_GPIO2, INPUT);
@@ -47,4 +47,15 @@ void playAudioInterrupt(uint8_t trackIdx) {
     myDFPlayer.stop();
     vTaskDelay(100 / portTICK_PERIOD_MS); // Ensure stop
     myDFPlayer.play(audioTracks[trackIdx].trackNum);
+}
+
+void parpadear_backlight(void){
+  lcd.noBacklight();
+  delay(100);
+  lcd.backlight();
+  delay(100);
+  lcd.noBacklight();
+  delay(100);
+  lcd.backlight();
+  delay(100);
 }

@@ -31,6 +31,7 @@ extern PCF8574 pcf;
 extern LiquidCrystal_I2C lcd;
 
 enum RfEventType { SHORT_PRESS, LONG_PRESS };
+enum MainTaskMsgType { BUTTON_EVENT, PREPARATION_READY, QUEST_COMPLETED, CONSEQUENCE_COMPLETED, RESTART_REQUESTED, QUEST_FAILED };
 struct RfEvent {
   uint8_t channel;
   RfEventType type;
@@ -38,6 +39,7 @@ struct RfEvent {
 struct MainTaskMsg {
   uint8_t channel;
   RfEventType type;
+  MainTaskMsgType msgType;
 };
 
 extern volatile unsigned long pressStart[4];
@@ -79,3 +81,12 @@ const AudioTrack audioTracks[] = {
     {8, 5000},  // Timeout 3
     {9, 11000}  // Reset audio
 };
+
+/*----------Quest Variables----------*/
+#define boton digital_GPIO1
+#define circuito_llaves digital_GPIO2
+#define llave_sistema digital_GPIO3
+#define potenciometro_latitud analog_input1
+#define potenciometro_longitud analog_input2
+
+extern int bateria;

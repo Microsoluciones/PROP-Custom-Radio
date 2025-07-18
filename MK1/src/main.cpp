@@ -120,7 +120,7 @@ int quest(){
   lcd.setCursor(0,0); lcd.print("                    ");
   lcd.setCursor(0,1); lcd.print("                    ");
   lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
-  lcd.setCursor(0,1); lcd.print(" Latitud y longitud "); 
+  lcd.setCursor(0,1); lcd.print(" Latitud y longitud ");
 
   if (espera_valores_en_rango() == true){
     parpadear_backlight();

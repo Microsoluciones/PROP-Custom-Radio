@@ -59,23 +59,118 @@ void rfControllerTask(void *pvParameters) {
 */
 void mainTask(void *pvParameters) {
     MainTaskMsg msg;
-    pinMode(LED_BUILTIN, OUTPUT);
-    
+    bool prepReady = false;
+    bool questComplete = false;
+    bool consequenceComplete = false;
+    Serial.println("Main task started, waiting for events...");
+    while (1) {
+        if (xQueueReceive(mainTaskQueue, &msg, portMAX_DELAY) == pdTRUE) {
+            // Start preparation on short press
+            if (!prepReady && msg.channel == 0 && msg.type == SHORT_PRESS) {
+                Serial.println("Preparation task started");
+                xTaskCreatePinnedToCore(preparationTask, "Preparation Task", 2048, NULL, 1, NULL, 1);
+            }
+            // Set flag when preparation is ready
+            if (msg.msgType == PREPARATION_READY) {
+                prepReady = true;
+                Serial.println("Preparation ready, waiting for long press to start quest...");
+            }
+            // Start quest on long press after preparation is ready
+            if (prepReady) {
+                Serial.println("Long press detected, starting quest task");
+                xTaskCreatePinnedToCore(questTask, "Quest Task", 2048, NULL, 1, NULL, 1);
+                prepReady = false; // Reset for next cycle
+            }
+            if (msg.msgType == QUEST_COMPLETED ) {
+                Serial.println("Quest completed, starting consequence task");
+                xTaskCreatePinnedToCore(consequenceTask, "Consequence Task", 2048, NULL, 1, NULL, 1);
+            }
+            if (consequenceComplete && msg.channel == 0 && msg.type == SHORT_PRESS) {
+                Serial.println("Restart requested, starting restart sequence task");
+                xTaskCreatePinnedToCore(restartSequenceTask, "Restart Sequence Task", 2048, NULL, 1, NULL, 1);
+            }
+        }
+    }
 }
-
 
 void preparationTask(void *pvParameters) {
-    while (1) {
-        // Preparation logic here
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
+    lcd.clear();
+    lcd.backlight();
+    lcd.setCursor(0,2); lcd.print("Alerta: Bateria Baja");
+    lcd.setCursor(0,3); lcd.print("Bateria Restante   %");
+    lcd.setCursor(17,3);lcd.print(bateria);
+
+    // Notify mainTask that preparation is ready
+    MainTaskMsg readyMsg = {};
+    readyMsg.msgType = PREPARATION_READY;
+    xQueueSend(mainTaskQueue, &readyMsg, 0);
+
+    Serial.println("Preparation done, task ending.");
+    vTaskDelete(NULL); // End this task when done
 }
 
+
 void questTask(void *pvParameters) {
-    while (1) {
-        // Quest logic here
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    const unsigned long QUEST_TIME_MS = bateria * 60 * 1000; // 15 minutes
+    unsigned long startTime = millis();
+    bool questFinished = false;
+
+    lcd.clear();
+    // lcd.setCursor(0, 0); lcd.print("Quest started!");
+    lcd.setCursor(0, 1);    lcd.print("Tiempo restante:");
+    lcd.setCursor(0,2);     lcd.print("Alerta: Bateria Baja");
+    lcd.setCursor(0,3);     lcd.print("Bateria Restante   %");
+    lcd.setCursor(17,3);    lcd.print(bateria);
+
+    while (!questFinished) {
+        // Show remaining time
+        unsigned long elapsed = millis() - startTime;
+        unsigned long remaining = (elapsed < QUEST_TIME_MS) ? (QUEST_TIME_MS - elapsed) : 0;
+        lcd.setCursor(16, 1);
+        lcd.print(remaining / 60000); // Minutes left
+
+        // Step 1: llave_sistema to GND
+        lcd.setCursor(0,0); lcd.print("                    ");
+        lcd.setCursor(0,1); lcd.print("                    ");
+        lcd.setCursor(0,0); lcd.print("   Iniciar Sistema  ");
+        if (digitalRead(llave_sistema) != LOW) continue; parpadear_backlight();
+
+        // Step 2: circuito_llaves to GND
+        lcd.setCursor(0,0); lcd.print("                    ");
+        lcd.setCursor(0,1); lcd.print("                    ");
+        lcd.setCursor(0,0); lcd.print("Configurar  Circuito"); 
+        lcd.setCursor(0,1); lcd.print("      Electrico     ");
+        if (digitalRead(circuito_llaves) != LOW) continue; parpadear_backlight();
+
+        // Step 3: analog potentiometers in range
+        lcd.setCursor(0,0); lcd.print("                    ");
+        lcd.setCursor(0,1); lcd.print("                    ");
+        lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
+        lcd.setCursor(0,1); lcd.print(" Latitud y longitud ");
+        int pot1 = analogRead(potenciometro_latitud);
+        int pot2 = analogRead(potenciometro_longitud);
+        if (!(pot1 > 1000 && pot1 < 2000)) continue; // Example range, adjust as needed
+        if (!(pot2 > 1500 && pot2 < 2500)) continue; // Example range, adjust as needed
+
+        // Step 4: boton pressed
+        lcd.setCursor(0,0); lcd.print("                    ");
+        lcd.setCursor(0,1); lcd.print("                    ");
+        lcd.setCursor(0,0); lcd.print("  Enviar Señal SOS  ");
+        if (digitalRead(boton) != LOW) continue; parpadear_backlight();
+
+        // All steps complete
+        questFinished = true;
     }
+
+    //lcd.clear();
+    //lcd.setCursor(0, 0); lcd.print("Quest completada!");
+
+    // Notify mainTask
+    MainTaskMsg msg = {};
+    msg.msgType = QUEST_COMPLETED;
+    xQueueSend(mainTaskQueue, &msg, 0);
+
+    vTaskDelete(NULL);
 }
 
 void consequenceTask(void *pvParameters) {

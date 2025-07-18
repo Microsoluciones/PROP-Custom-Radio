@@ -5,7 +5,7 @@
 #include "isr.h"
 
 // --- Global variable definitions ---
-const int rfPins[4] = {23, 4, 15, 25};
+const int rfPins[4] = {15, 23, 4, 25};
 const unsigned long LONG_PRESS_MS = 800;
 QueueHandle_t rfEventQueue;
 QueueHandle_t mainTaskQueue;
@@ -17,6 +17,8 @@ volatile unsigned long pressStart[4] = {0, 0, 0, 0};
 volatile bool pressed[4] = {false, false, false, false};
 LiquidCrystal_I2C lcd(0x27, 20, 4); // Adjust address and size as needed
 
+
+int bateria = 15; // Example initial value, adjust as needed
 
 void setup() {
     Serial.begin(115200);
@@ -39,6 +41,7 @@ void setup() {
     lcd.init();
     lcd.backlight();
     lcd.setCursor(0, 0); lcd.print("Initializing...");
+    delay(3000);
     //-----------------------------------------------------------------
     myDFPlayerSerial.begin(9600, SERIAL_8N1, 16, 17);
     if (!myDFPlayer.begin(myDFPlayerSerial)) {
@@ -54,7 +57,6 @@ void setup() {
     mainTaskQueue = xQueueCreate(10, sizeof(MainTaskMsg));
     xTaskCreatePinnedToCore(rfControllerTask, "RF Controller", 2048, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(mainTask, "Main Task", 2048, NULL, 1, NULL, 1);
-
     sr.set(LED_SETUP_OK, HIGH);
     Serial.println("Setup complete, tasks started.");
 }
