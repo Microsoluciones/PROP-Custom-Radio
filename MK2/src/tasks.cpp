@@ -119,6 +119,7 @@ void questTask(void *pvParameters) {
     const unsigned long QUEST_TIME_MS = bateria * 60 * 1000; // 15 minutes
     unsigned long startTime = millis();
     bool questFinished = false;
+    bool skipp = false;
     if (state == 0) {
         state = 1;
     } else {
@@ -132,7 +133,6 @@ void questTask(void *pvParameters) {
     lcd.setCursor(17,3);    lcd.print(bateria); lcd.print("%");
 
     while (!questFinished) {
-        bool skipp = false;
         if (xQueueReceive(mainTaskQueue, &msg, 1000/portTICK_PERIOD_MS) == pdTRUE) {
             if (msg.channel == 1 && msg.type == LONG_PRESS) {
                 Serial.println("Step Skipped");
@@ -176,7 +176,8 @@ void questTask(void *pvParameters) {
         lcd.setCursor(0,0); lcd.print("                    ");
         lcd.setCursor(0,1); lcd.print("                    ");
         lcd.setCursor(0,0); lcd.print("  Enviar Señal SOS  ");
-        if (digitalRead(boton) != LOW) continue; parpadear_backlight();
+        if (digitalRead(boton) != LOW || skipp) continue; parpadear_backlight();
+        skipp = false;
 
         // All steps complete
         questFinished = true;
