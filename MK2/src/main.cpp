@@ -1,80 +1,67 @@
 #include <Arduino.h>
-#include <LiquidCrystal_I2C.h>
-#include <Wire.h>
 #include "globals.h"
+#include "functions.h"
+#include "tasks.h"
+#include "isr.h"
 
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+// --- Global variable definitions ---
+const int rfPins[4] = {15 , 23, 25 , 4};
+const unsigned long LONG_PRESS_MS = 800;
+QueueHandle_t rfEventQueue;
+QueueHandle_t mainTaskQueue;
+QueueHandle_t questTaskQueue;
+TaskHandle_t consequenceTaskHandle = NULL;
+ShiftRegister74HC595<2> sr(5, 19, 18);
+HardwareSerial myDFPlayerSerial(2);
+DFRobotDFPlayerMini myDFPlayer;
+PCF8574 pcf(0x20);
+volatile unsigned long pressStart[4] = {0, 0, 0, 0};
+volatile bool pressed[4] = {false, false, false, false};
+LiquidCrystal_I2C lcd(0x27, 20, 4); // Adjust address and size as needed
+
+
+int bateria = 15; // Example initial value, adjust as needed
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("Setup started");
+    sr.setAllLow(); Serial.println("Shift Register cleared");
+    gpio_declarations(); Serial.println("GPIOs initialized");
+    Wire.begin(21, 22); // or your actual SDA, SCL pins
+    // for hat
+    /*-----------------------------------------------------------------
     
-    // Initialize I2C and LCD
-    Wire.begin(21, 22); // SDA, SCL pins
+    if (!pcf.begin()) {
+        Serial.println("PCF8574 not found!");
+    } else {
+        Serial.println("PCF8574 online.");
+        // After successful I2C init
+        sr.set(LED_I2C, HIGH);
+    }
+    -----------------------------------------------------------------*/
+    // for display
     lcd.init();
     lcd.backlight();
-    lcd.clear();
-    
-    // Initialize potentiometer pins
-    pinMode(potenciometro_latitud, INPUT);
-    pinMode(potenciometro_longitud, INPUT);
-    
-    // Display header
-    lcd.setCursor(0, 0); lcd.print("Potentiometer Values");
-    lcd.setCursor(0, 1); lcd.print("Latitud:");
-    lcd.setCursor(0, 2); lcd.print("Longitud:");
-    lcd.setCursor(0, 3); lcd.print("Press to set target");
-    
-    Serial.println("Potentiometer Calibration Started");
-    Serial.println("Latitud\tLongitud");
+    //-----------------------------------------------------------------
+    myDFPlayerSerial.begin(9600, SERIAL_8N1, 16, 17);
+    if (!myDFPlayer.begin(myDFPlayerSerial)) {
+        Serial.println("Unable to begin DFPlayer Mini:\n"
+                        "Check SD card.\n"
+                        "check hardware connections.\n");
+    } else {
+        Serial.println("DFPlayer Mini online.");
+        sr.set(LED_DFPLAYER, HIGH);
+    }
+
+    rfEventQueue = xQueueCreate(10, sizeof(RfEvent));
+    mainTaskQueue = xQueueCreate(10, sizeof(MainTaskMsg));
+    questTaskQueue = xQueueCreate(5, sizeof(MainTaskMsg));
+    xTaskCreatePinnedToCore(rfControllerTask, "RF Controller", 2048, NULL, 2, NULL, 1);
+    xTaskCreatePinnedToCore(mainTask, "Main Task", 2048, NULL, 1, NULL, 1);
+    sr.set(LED_SETUP_OK, HIGH);
+    Serial.println("Setup complete, tasks started.");
 }
 
 void loop() {
-    // Read both potentiometers
-    int latitud = analogRead(potenciometro_latitud);
-    int longitud = analogRead(potenciometro_longitud);
-    
-    // Display on LCD
-    lcd.setCursor(9, 1);  // Position after "Latitud:"
-    lcd.print("    ");    // Clear old value
-    lcd.setCursor(9, 1);
-    lcd.print(latitud);
-    
-    lcd.setCursor(10, 2); // Position after "Longitud:"
-    lcd.print("    ");    // Clear old value
-    lcd.setCursor(10, 2);
-    lcd.print(longitud);
-    
-    // Display on Serial Monitor
-    Serial.print(latitud);
-    Serial.print("\t");
-    Serial.println(longitud);
-    
-    // Check if both are in your current target range
-    bool latitudOK = (latitud > 1000 && latitud < 2000);
-    bool longitudOK = (longitud > 1500 && longitud < 2500);
-    
-    // Show status
-    lcd.setCursor(15, 1);
-    if (latitudOK) {
-        lcd.print("OK");
-    } else {
-        lcd.print("--");
-    }
-    
-    lcd.setCursor(15, 2);
-    if (longitudOK) {
-        lcd.print("OK");
-    } else {
-        lcd.print("--");
-    }
-    
-    // Overall status
-    lcd.setCursor(0, 3);
-    if (latitudOK && longitudOK) {
-        lcd.print("TARGET REACHED!     ");
-    } else {
-        lcd.print("Adjust potentiometers");
-    }
-    
-    delay(100); // Update every 100ms
+    // Nothing to do in loop
 }

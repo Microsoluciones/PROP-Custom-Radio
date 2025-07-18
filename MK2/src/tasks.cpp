@@ -213,9 +213,9 @@ void questTask(void *pvParameters) {
             case 2: {// Step 3: analog potentiometers in range
                 lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
                 lcd.setCursor(0,1); lcd.print(" Latitud y longitud ");
-                int pot1 = analogRead(potenciometro_latitud);
-                int pot2 = analogRead(potenciometro_longitud);
-                if ((pot1 > 1000 && pot1 < 2000) && (pot2 > 1500 && pot2 < 2500)){
+                int pot2 = analogRead(potenciometro_latitud);
+                int pot1 = analogRead(potenciometro_longitud);
+                if ((pot1 > 600 && pot1 < 1100) && (pot2 > 1800 && pot2 < 2300)){
                     lcd.setCursor(0,0);lcd.print("                    ");
                     lcd.setCursor(0,1);lcd.print("                    ");
                     step++;
