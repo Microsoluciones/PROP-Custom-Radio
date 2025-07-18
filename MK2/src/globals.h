@@ -25,7 +25,6 @@ extern const unsigned long LONG_PRESS_MS;
 extern QueueHandle_t rfEventQueue;
 extern QueueHandle_t mainTaskQueue;
 extern QueueHandle_t questTaskQueue;
-extern TaskHandle_t consequenceTaskHandle;
 extern ShiftRegister74HC595<2> sr;
 extern HardwareSerial myDFPlayerSerial;
 extern DFRobotDFPlayerMini myDFPlayer;
