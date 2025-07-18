@@ -76,7 +76,7 @@ void mainTask(void *pvParameters) {
                 Serial.println("Preparation ready, waiting for long press to start quest...");
             }
             // Start quest on long press after preparation is ready
-            if (prepReady) {
+            if (prepReady && msg.channel == 0 && msg.type == LONG_PRESS) {
                 Serial.println("Long press detected, starting quest task");
                 xTaskCreatePinnedToCore(questTask, "Quest Task", 2048, NULL, 1, NULL, 1);
                 prepReady = false; // Reset for next cycle
@@ -106,6 +106,7 @@ void preparationTask(void *pvParameters) {
     xQueueSend(mainTaskQueue, &readyMsg, 0);
 
     Serial.println("Preparation done, task ending.");
+    lcd.setCursor(1, 0); lcd.print("Preparacion lista!");
     vTaskDelete(NULL); // End this task when done
 }
 

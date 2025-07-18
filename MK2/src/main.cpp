@@ -40,8 +40,6 @@ void setup() {
     // for display
     lcd.init();
     lcd.backlight();
-    lcd.setCursor(0, 0); lcd.print("Initializing...");
-    delay(3000);
     //-----------------------------------------------------------------
     myDFPlayerSerial.begin(9600, SERIAL_8N1, 16, 17);
     if (!myDFPlayer.begin(myDFPlayerSerial)) {
@@ -59,6 +57,7 @@ void setup() {
     xTaskCreatePinnedToCore(mainTask, "Main Task", 2048, NULL, 1, NULL, 1);
     sr.set(LED_SETUP_OK, HIGH);
     Serial.println("Setup complete, tasks started.");
+    lcd.setCursor(0, 0); lcd.print("Esperando...");
 }
 
 void loop() {

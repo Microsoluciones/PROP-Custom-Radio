@@ -34,12 +34,12 @@ esp_err_t gpio_declarations(void) {
   pinMode(buzzer, OUTPUT);
 
   /*----------custom declarations----------*/
-  pinMode(digital_GPIO1, INPUT);
-  pinMode(digital_GPIO2, INPUT);
-  pinMode(digital_GPIO3, INPUT);
-  pinMode(digital_GPIO4, INPUT);
-  pinMode(digital_GPIO5, INPUT);
-  pinMode(digital_GPIO6, INPUT);
+  pinMode(digital_GPIO1, INPUT_PULLUP);
+  pinMode(digital_GPIO2, INPUT_PULLUP);
+  pinMode(digital_GPIO3, INPUT_PULLUP);
+  pinMode(digital_GPIO4, INPUT_PULLUP);
+  pinMode(digital_GPIO5, INPUT_PULLUP);
+  pinMode(digital_GPIO6, INPUT_PULLUP);
   return ESP_OK;
 }
 
