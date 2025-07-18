@@ -115,39 +115,53 @@ void preparationTask(void *pvParameters) {
 
 void questTask(void *pvParameters) {
     MainTaskMsg msg;
-    bool state = true; // Example state variable, adjust as needed
+    bool state = 0; // Example state variable, adjust as needed
     const unsigned long QUEST_TIME_MS = bateria * 60 * 1000; // 15 minutes
     unsigned long startTime = millis();
     bool questFinished = false;
-    sr.set(LED_QUEST_0, !state);
+    if (state == 0) {
+        state = 1;
+    } else {
+        state = 0;
+    }
+    sr.set(LED_QUEST_0, state);
     lcd.clear();
     // lcd.setCursor(0, 0); lcd.print("Quest started!");
-    lcd.setCursor(0,2);     lcd.print("Alerta: Bateria Baja");
-    lcd.setCursor(0,3);     lcd.print("Bateria Restante:");
-    lcd.setCursor(17,3);    lcd.print(bateria);
+    lcd.setCursor(0,2);    lcd.print("Alerta: Bateria Baja");
+    lcd.setCursor(0,3);    lcd.print("Bateria Restante:  %");
+    lcd.setCursor(17,3);    lcd.print(bateria); lcd.print("%");
 
     while (!questFinished) {
-        xQueueReceive(mainTaskQueue, &msg, portMAX_DELAY);
+        bool skipp = false;
+        if (xQueueReceive(mainTaskQueue, &msg, 1000/portTICK_PERIOD_MS) == pdTRUE) {
+            if (msg.channel == 1 && msg.type == LONG_PRESS) {
+                Serial.println("Step Skipped");
+                skipp = true;
+            } else if (msg.channel == 2 && msg.type == LONG_PRESS) {
+                Serial.println("Quest Terminated");
+                questFinished = true;
+            }
+        }
         // Show remaining time
         unsigned long elapsed = millis() - startTime;
         unsigned long remaining = (elapsed < QUEST_TIME_MS) ? (QUEST_TIME_MS - elapsed) : 0;
         lcd.setCursor(17, 3);
-        lcd.print(":  ");
+        lcd.print(":   ");
         lcd.setCursor(17, 3);
         lcd.print(remaining / 60000); lcd.print("%");
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Update every second
+        //vTaskDelay(1000 / portTICK_PERIOD_MS); // Update every second
         // Step 1: llave_sistema to GND
         lcd.setCursor(0,0); lcd.print("                    ");
         lcd.setCursor(0,1); lcd.print("                    ");
         lcd.setCursor(0,0); lcd.print("   Iniciar Sistema  ");
-        if (digitalRead(llave_sistema) != LOW || (msg.channel == 1 && msg.type == SHORT_PRESS)) continue; parpadear_backlight();
-
+        if (digitalRead(llave_sistema) != LOW || skipp) continue; parpadear_backlight();
+        skipp = false;
         // Step 2: circuito_llaves to GND
         lcd.setCursor(0,0); lcd.print("                    ");
         lcd.setCursor(0,1); lcd.print("                    ");
         lcd.setCursor(0,0); lcd.print("Configurar  Circuito"); 
         lcd.setCursor(0,1); lcd.print("      Electrico     ");
-        if (digitalRead(circuito_llaves) != LOW || (msg.channel == 1 && msg.type == SHORT_PRESS)) continue; parpadear_backlight();
+        if (digitalRead(circuito_llaves) != LOW) continue; parpadear_backlight();
 
         // Step 3: analog potentiometers in range
         lcd.setCursor(0,0); lcd.print("                    ");
@@ -156,13 +170,13 @@ void questTask(void *pvParameters) {
         lcd.setCursor(0,1); lcd.print(" Latitud y longitud ");
         int pot1 = analogRead(potenciometro_latitud);
         int pot2 = analogRead(potenciometro_longitud);
-        if ( (!((pot1 > 1000 && pot1 < 2000) && !(pot2 > 1500 && pot2 < 2500))) || (msg.channel == 1 && msg.type == SHORT_PRESS) ) continue;  parpadear_backlight(); // Example range, adjust as needed
+        if (!(pot1 > 1000 && pot1 < 2000) && !(pot2 > 1500 && pot2 < 2500)) continue;  parpadear_backlight(); // Example range, adjust as needed
 
         // Step 4: boton pressed
         lcd.setCursor(0,0); lcd.print("                    ");
         lcd.setCursor(0,1); lcd.print("                    ");
         lcd.setCursor(0,0); lcd.print("  Enviar Señal SOS  ");
-        if (digitalRead(boton) != LOW || (msg.channel == 1 && msg.type == SHORT_PRESS)) continue; parpadear_backlight();
+        if (digitalRead(boton) != LOW) continue; parpadear_backlight();
 
         // All steps complete
         questFinished = true;
@@ -178,6 +192,7 @@ void questTask(void *pvParameters) {
 
     vTaskDelete(NULL);
 }
+
 
 void consequenceTask(void *pvParameters) {
     while (1) {
