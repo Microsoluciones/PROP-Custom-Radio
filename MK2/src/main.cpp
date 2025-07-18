@@ -5,7 +5,7 @@
 #include "isr.h"
 
 // --- Global variable definitions ---
-const int rfPins[4] = {15, 23, 4, 25};
+const int rfPins[4] = {15 , 23, 25 , 4};
 const unsigned long LONG_PRESS_MS = 800;
 QueueHandle_t rfEventQueue;
 QueueHandle_t mainTaskQueue;
@@ -57,7 +57,6 @@ void setup() {
     xTaskCreatePinnedToCore(mainTask, "Main Task", 2048, NULL, 1, NULL, 1);
     sr.set(LED_SETUP_OK, HIGH);
     Serial.println("Setup complete, tasks started.");
-    lcd.setCursor(0, 0); lcd.print("Esperando...");
 }
 
 void loop() {
