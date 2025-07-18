@@ -7,3 +7,5 @@ void playAudioInterrupt(uint8_t trackIdx);
 
 
 void parpadear_backlight(void);
+void scrollText(int row, String message, int delayTime, int lcdColumns);
+void clearQueue(QueueHandle_t queue);
