@@ -1,27 +1,3 @@
-## RF Message Handling and Filtering
-
-### Robust Message Fetching: `getRfValidMessage`
-
-To ensure only valid and fresh RF messages are processed by each task, use the helper function:
-
-```cpp
-bool getRfValidMessage(MainTaskMsg* outMsg, bool (*isValid)(const MainTaskMsg&));
-```
-
-- Skips old messages (older than 2 seconds)
-- Skips unwanted messages (not valid for the current phase)
-- Returns true if a valid message is found, false if timeout
-
-**Example usage in a task:**
-
-```cpp
-auto isValid = [](const MainTaskMsg& m) { return (m.channel == 0 && m.type == LONG_PRESS); };
-if (getRfValidMessage(&msg, isValid)) {
-	// Process valid message
-}
-```
-
-This prevents the queue from being blocked by stale or irrelevant messages and makes the system robust to user errors.
 # PROP Board Ultra - Generic Escape Room Template
 
 A robust, reusable template for ESP32-based escape room projects with smart message routing and task-based architecture.

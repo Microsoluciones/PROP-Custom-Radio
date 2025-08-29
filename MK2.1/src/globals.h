@@ -3,20 +3,8 @@
 #include <ShiftRegister74HC595.h>
 #include <DFRobotDFPlayerMini.h>
 #include <PCF8574.h>
-#include <LiquidCrystal_I2C.h> // LCD 20x4 display (I2C, PCF8574 adapter, address 0x27)
-
-// Usage: lcd.setCursor(col, row); lcd.print("text");
-extern LiquidCrystal_I2C lcd;
-
-extern const int rfPins[4];
-extern const unsigned long LONG_PRESS_MS;
-extern QueueHandle_t rfEventQueue;
-extern QueueHandle_t gameCommandQueue;
-extern ShiftRegister74HC595<2> sr;
-extern HardwareSerial myDFPlayerSerial;
-extern int currentDFPlayerVolume; // Track last set volume
-extern DFRobotDFPlayerMini myDFPlayer;
-extern PCF8574 pcf; // I2C I/O expander - available for project-specific use
+#include <LiquidCrystal_I2C.h>
+#include <string.h>
 
 #define led_BUILTIN 2 // Define the built-in LED pin
 #define buzzer 2
@@ -32,6 +20,17 @@ extern PCF8574 pcf; // I2C I/O expander - available for project-specific use
 #define analog_input2 35
 #define analog_input3 36
 #define analog_input4 39
+
+extern const int rfPins[4];
+extern const unsigned long LONG_PRESS_MS;
+extern QueueHandle_t rfEventQueue;
+extern QueueHandle_t gameCommandQueue;
+extern ShiftRegister74HC595<2> sr;
+extern HardwareSerial myDFPlayerSerial;
+extern int currentDFPlayerVolume; // Track last set volume
+extern DFRobotDFPlayerMini myDFPlayer;
+extern PCF8574 pcf; // I2C I/O expander - available for project-specific use
+extern LiquidCrystal_I2C lcd; // I2C LCD display
 
 enum RfEventType { SHORT_PRESS, LONG_PRESS };
 struct RfEvent {
@@ -53,6 +52,7 @@ extern volatile bool pressed[4];
 
 // Global variables for game state
 extern bool systemReady;
+extern bool questSuccess; // True if quest completed successfully, false if failed
 extern TaskHandle_t mainTaskHandle;
 extern TaskHandle_t preparationTaskHandle;
 extern TaskHandle_t questTaskHandle;
@@ -101,25 +101,21 @@ struct TrackInfo {
 
 // Example track definitions for DFPlayer usage
 // Track number (zero-based, matches SD file name e.g. 0000.mp3), duration (ms), volume (0-20)
-extern const TrackInfo exampleTracks[];
-// Function to detect broken lasers (saved for projects that need laser detection)
-// Note: PCF8574 I2C bus is available for project-specific I/O expansion
-struct LaserStatus {
-    bool working[8]; // Adjust size as needed
-    uint8_t totalLasers;
+const TrackInfo exampleTracks[] = {
+  {0, 3200, 15},   // Track 0 (0000.mp3), 3.2s, volume 15
+  {1, 5000, 10},   // Track 1 (0001.mp3), 5.0s, volume 10
+  {2, 2100, 20}    // Track 2 (0002.mp3), 2.1s, volume 20
 };
+// TODO: Add project-specific global variables and structures here
+/*----------Quest Variables----------*/
+#define SOS_BUTTON digital_GPIO1
+#define CABLE_CIRCUIT digital_GPIO2
+#define SYSTEM_SWITCH digital_GPIO3
+#define POT_LATITUDE analog_input1
+#define POT_LONGITUDE analog_input2
 
-
-// === Project-specific global variables and structures ===
-
-// Indicates if the quest was successful (true = win, false = lose)
-extern bool questSuccess;
-
-//----------Quest Variables----------//
-#define boton digital_GPIO1 // acts as a button
-#define circuito_llaves digital_GPIO2 // acts as a button
-#define llave_sistema digital_GPIO3 // acts as a button
-#define potenciometro_latitud analog_input1
-#define potenciometro_longitud analog_input2
-
-// TODO: Add more project-specific global variables and structures here
+extern int battery;
+extern const int pot_latitude_max;
+extern const int pot_latitude_min;
+extern const int pot_longitude_max;
+extern const int pot_longitude_min;

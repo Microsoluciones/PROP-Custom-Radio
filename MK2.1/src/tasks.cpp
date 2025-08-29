@@ -122,12 +122,21 @@ void mainTask(void *pvParameters) {
     while (1) {
         switch (currentGameState) {
             case STATE_IDLE:
-                if (xQueueReceive(gameCommandQueue, &msg, portMAX_DELAY) == pdTRUE) {
-                    if (msg.channel == 0 && msg.type == SHORT_PRESS) {
-                        Serial.println("Starting preparation phase...");
-                        flushGameCommandQueue();
-                        currentGameState = STATE_PREPARATION;
+                // Show centered message on LCD (only lines 2 and 3 used)
+                lcd.init();
+                lcd.backlight();
+                lcd.clear();
+                lcdPrintCentered(lcd, "", "Pulsacion Corta en A", "Para", "Iniciar Preparacion");
+                while (currentGameState == STATE_IDLE) {
+                    if (xQueueReceive(gameCommandQueue, &msg, 100 / portTICK_PERIOD_MS) == pdTRUE) {
+                        if (msg.channel == 0 && msg.type == SHORT_PRESS) {
+                            Serial.println("Starting preparation phase...");
+                            flushGameCommandQueue();
+                            currentGameState = STATE_PREPARATION;
+                        }
                     }
+                    // Optionally, add a small delay to avoid busy loop
+                    vTaskDelay(50 / portTICK_PERIOD_MS);
                 }
                 break;
             case STATE_PREPARATION:
@@ -136,6 +145,7 @@ void mainTask(void *pvParameters) {
                     vTaskDelay(100 / portTICK_PERIOD_MS);
                 }
                 Serial.println("Preparation phase completed");
+                flushGameCommandQueue();
                 break;
             case STATE_QUEST:
                 Serial.println("Starting quest phase...");
@@ -143,6 +153,7 @@ void mainTask(void *pvParameters) {
                 while (currentGameState == STATE_QUEST) {
                     vTaskDelay(100 / portTICK_PERIOD_MS);
                 }
+                flushGameCommandQueue();
                 Serial.println("Quest phase completed");
                 break;
             case STATE_CONSEQUENCE:
@@ -151,6 +162,7 @@ void mainTask(void *pvParameters) {
                 while (currentGameState == STATE_CONSEQUENCE) {
                     vTaskDelay(100 / portTICK_PERIOD_MS);
                 }
+                flushGameCommandQueue();
                 Serial.println("Consequence phase completed");
                 break;
         }
@@ -166,16 +178,6 @@ void preparationTask(void *pvParameters) {
     pinMode(LED_BUILTIN, OUTPUT);
     Serial.println("Preparation phase: Initial setup");
     MainTaskMsg msg;
-
-    // --- LCD PREPARATION PHASE MESSAGE ---
-    lcd.init();
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Pulsacion Larga");
-    lcd.setCursor(0, 1);
-    lcd.print("en A para iniciar");
-    lcd.backlight();
-
     // --- STANDARDIZED CONTROLLER USAGE ---
     // - Use controller for configuration as needed (customize below)
     // - RF1 long press ALWAYS ends preparation and starts quest (required for all projects)
@@ -186,12 +188,28 @@ void preparationTask(void *pvParameters) {
         return (m.channel == 0 && m.type == LONG_PRESS);
     };
     while (!setupComplete) {
-        // CUSTOMIZE: Add additional controller logic for configuration here if needed
-        if (getRfValidMessage(&msg, isValid)) {
-            Serial.printf("Received RF%d %s in preparation phase\n", msg.channel + 1, msg.type == LONG_PRESS ? "long" : "short");
-            Serial.println("Preparation complete - Moving to quest phase!");
-            setupComplete = true;
+        // Read digital inputs (HIGH = not pressed/on)
+        int sw1 = digitalRead(SOS_BUTTON);
+        int sw2 = digitalRead(CABLE_CIRCUIT);
+        int sw3 = digitalRead(SYSTEM_SWITCH);
+        // Read potentiometers
+        int pot_lat = analogRead(POT_LATITUDE);
+        int pot_long = analogRead(POT_LONGITUDE);
+        // Check if all digital inputs are HIGH and both pots are outside their valid ranges
+        bool pots_outside = (pot_lat < pot_latitude_min || pot_lat > pot_latitude_max) && (pot_long < pot_longitude_min || pot_long > pot_longitude_max);
+        bool switches_ok = (sw1 == HIGH && sw2 == HIGH && sw3 == HIGH);
+        if (!switches_ok || !pots_outside) {
+            lcdPrintCentered(lcd, "", "Ajuste todos los", "controles a cero", "");
+        } else {
+            lcdPrintCentered(lcd, "", "Listo para iniciar", "Pulsacion Larga en A", "Para continuar");
+            // Now allow RF1 long press to finish preparation
+            if (getRfValidMessage(&msg, isValid)) {
+                Serial.printf("Received RF%d %s in preparation phase\n", msg.channel + 1, msg.type == LONG_PRESS ? "long" : "short");
+                Serial.println("Preparation complete - Moving to quest phase!");
+                setupComplete = true;
+            }
         }
+        vTaskDelay(250 / portTICK_PERIOD_MS);
     }
     flushGameCommandQueue();
     currentGameState = STATE_QUEST;
@@ -199,117 +217,117 @@ void preparationTask(void *pvParameters) {
 }
 
 void questTask(void *pvParameters) {
-
-
-    // --- Adapted quest logic with new architecture ---
-    int bateria = 15; // battery percent (15 minutes)
-    const unsigned long QUEST_TIME_MS = bateria * 60 * 1000UL;
-    unsigned long startTime = millis();
+    Serial.println("Quest task started - Main game phase");
+    Serial.println("Quest phase: Initializing game logic...");
+    lcd.clear();
+    lcdPrintCentered(lcd, "", "Comienza la mision", "Buena Suerte!", "");
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    const int totalSteps = 4;
+    int currentStep = 0;
+    battery = 15; // battery = minutes left, also percent
+    unsigned long lastMinuteTick = millis();
     bool questComplete = false;
     questSuccess = false;
-    int step = 0;
+    MainTaskMsg msg;
 
-    sr.set(LED_QUEST_ACTIVE, 1);
-    lcd.clear();
-    lcd.setCursor((20-19)/2,2); lcd.print("Alerta: Bateria Baja");
-    lcd.setCursor((20-20)/2,3); lcd.print("Bateria Restante:   %");
-    lcd.setCursor(17,3); lcd.print(bateria); lcd.print("%");
+    auto isValid = [](const MainTaskMsg& m) {
+        return ( (m.channel == 1 && m.type == LONG_PRESS) || (m.channel == 2 && m.type == LONG_PRESS) );
+    };
 
     while (!questComplete) {
-        // Show remaining time
-        unsigned long elapsed = millis() - startTime;
-        unsigned long remaining = (elapsed < QUEST_TIME_MS) ? (QUEST_TIME_MS - elapsed) : 0;
-        int batteryPercent = (remaining + 59999) / 60000; // round up to next minute
-        lcd.setCursor(17, 3);
-        lcd.print("   ");
-        lcd.setCursor(17, 3);
-        lcd.print(batteryPercent);
+        // Battery timer logic: only update between steps
+        unsigned long now = millis();
+        if (now - lastMinuteTick >= 60000 && battery > 0) {
+            battery--;
+            lastMinuteTick = now;
+        }
+    int percent = battery; // battery is percent, starts at 15 and drops to 0
+    char alertLine[21] = "Alerta: Bateria Baja";
+    char battLine[21];
+    snprintf(battLine, sizeof(battLine), "Bateria Restante:%2d%%", percent);
 
-        // Check for timeout FIRST
-        if (remaining == 0) {
-            Serial.println("Quest time expired - QUEST FAILED");
+        if (battery == 0) {
+            lcdPrintCentered(lcd, "", "Bateria agotada", "Mision fallida", "");
             questSuccess = false;
             questComplete = true;
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
             break;
         }
 
-        // Check for skip or end messages (RF2/RF3 long press)
-        MainTaskMsg msg;
-        auto skipValid = [](const MainTaskMsg& m) { return (m.channel == 1 && m.type == LONG_PRESS); };
-        auto failValid = [](const MainTaskMsg& m) { return (m.channel == 2 && m.type == LONG_PRESS); };
-        if (getRfValidMessage(&msg, skipValid)) {
-            step++;
-            blink_backlight();
-            Serial.printf("Skipping to step %d\n", step);
-            lcd.setCursor(0,0);lcd.print("                    ");
-            lcd.setCursor(0,1);lcd.print("                    ");
-            if (step > 3) {
-                questSuccess = true;
-                questComplete = true;
-                break;
+        // Step logic for each quest step
+        const char* legends1[] = {"Iniciar Sistema", "Configurar Circuito", "Indicar Coordenadas", "Enviar Senal SOS"};
+        const char* legends2[] = {"", "Electrico", "Latitud y Longitud", ""};
+        lcd.clear();
+        lcdPrintCentered(lcd, legends1[currentStep], legends2[currentStep], alertLine, battLine);
+
+        // Wait for step completion, skip, or quest abort
+        bool stepDone = false;
+        unsigned long lastDisplayUpdate = millis();
+        while (!stepDone && !questComplete) {
+            unsigned long nowStep = millis();
+            // Update battery every minute
+            if (nowStep - lastMinuteTick >= 60000 && battery > 0) {
+                battery--;
+                lastMinuteTick = nowStep;
+                percent = battery;
+                snprintf(battLine, sizeof(battLine), "Bateria Restante:%2d%%", percent);
+                // Always show alert and update bottom lines
+                lcd.setCursor(0, 2); lcd.print("                    ");
+                lcd.setCursor(0, 2); lcd.print(alertLine);
+                lcd.setCursor(0, 3); lcd.print("                    ");
+                lcd.setCursor(0, 3); lcd.print(battLine);
             }
-        } else if (getRfValidMessage(&msg, failValid)) {
-            Serial.println("Quest manually failed - QUEST FAILED");
-            questSuccess = false;
+            if(battery == 0){
+                questComplete = true;
+                questSuccess = false;
+            }
+            if (getRfValidMessage(&msg, isValid)) {
+                if (msg.channel == 1 && msg.type == LONG_PRESS) {
+                    Serial.printf("Step %d skipped by RF2 long press\n", currentStep+1);
+                    stepDone = true;
+                } else if (msg.channel == 2 && msg.type == LONG_PRESS) {
+                    Serial.println("Quest aborted by RF3 long press");
+                    lcdPrintCentered(lcd, "", "Mision abortada", "Mision fallida", "");
+                    questSuccess = false;
+                    questComplete = true;
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    break;
+                }
+            }
+            // Step completion conditions
+            switch (currentStep) {
+                case 0: // System Switch to GND
+                    if (digitalRead(SYSTEM_SWITCH) == LOW) stepDone = true;
+                    break;
+                case 1: // Cable Circuit to GND
+                    if (digitalRead(CABLE_CIRCUIT) == LOW) stepDone = true;
+                    break;
+                case 2: { // Potentiometers in range
+                    int lat = analogRead(POT_LATITUDE);
+                    int lon = analogRead(POT_LONGITUDE);
+                    if (lat >= pot_latitude_min && lat <= pot_latitude_max && lon >= pot_longitude_min && lon <= pot_longitude_max) stepDone = true;
+                    break;
+                }
+                case 3: // SOS Button to GND
+                    if (digitalRead(SOS_BUTTON) == LOW) stepDone = true;
+                    break;
+            }
+            vTaskDelay(20 / portTICK_PERIOD_MS);
+        }
+        if (questComplete) break;
+        currentStep++;
+        lcdStepSuccessAnimation();
+        if (currentStep >= totalSteps) {
+            questSuccess = true;
             questComplete = true;
+            lcdPrintCentered(lcd, "", "Mision completada", "Felicidades!", "");
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
             break;
         }
-
-        switch (step) {
-            case 0: // Step 1: llave_sistema to GND
-                lcd.setCursor(0,0); lcd.print("   Iniciar Sistema  ");
-                if (digitalRead(llave_sistema) == LOW){
-                    lcd.setCursor(0,0);lcd.print("                    ");
-                    lcd.setCursor(0,1);lcd.print("                    ");
-                    step++;
-                    blink_backlight();
-                }
-                break;
-            case 1: // Step 2: circuito_llaves to GND
-                lcd.setCursor(0,0); lcd.print("Configurar  Circuito");
-                lcd.setCursor(0,1); lcd.print("      Electrico     ");
-                if (digitalRead(circuito_llaves) == LOW){
-                    lcd.setCursor(0,0);lcd.print("                    ");
-                    lcd.setCursor(0,1);lcd.print("                    ");
-                    step++;
-                    blink_backlight();
-                }
-                break;
-            case 2: { // Step 3: analog potentiometers in range
-                lcd.setCursor(0,0); lcd.print("Indicar  Coordenadas");
-                lcd.setCursor(0,1); lcd.print(" Latitud y longitud ");
-                int pot2 = analogRead(potenciometro_latitud);
-                int pot1 = analogRead(potenciometro_longitud);
-                if ((pot1 > 600 && pot1 < 1100) && (pot2 > 1800 && pot2 < 2300)){
-                    lcd.setCursor(0,0);lcd.print("                    ");
-                    lcd.setCursor(0,1);lcd.print("                    ");
-                    step++;
-                    blink_backlight();
-                }
-                break;
-            }
-            case 3: {// Step 4: boton pressed
-                lcd.setCursor(0,0); lcd.print("  Enviar Senal SOS  ");
-                if (digitalRead(boton) == LOW){
-                    lcd.setCursor(0,0);lcd.print("                    ");
-                    lcd.setCursor(0,1);lcd.print("                    ");
-                    step++;
-                    blink_backlight();
-                }
-                break;
-            }
-            default:
-                questSuccess = true;
-                questComplete = true;
-                break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(50));
     }
-
-    // End of quest phase
-    sr.set(LED_QUEST_ACTIVE, 0);
-    //lcd.noBacklight();
+    flushGameCommandQueue();
     currentGameState = STATE_CONSEQUENCE;
+    vTaskDelete(NULL);
     vTaskDelete(NULL);
 }
 
@@ -327,20 +345,36 @@ void consequenceTask(void *pvParameters) {
         // Accept only RF1 short press to finish consequence (if not auto-end)
         return (m.channel == 0 && m.type == SHORT_PRESS);
     };
+    bool lcdOff = false;
     while (!consequenceComplete) {
-        // CUSTOMIZE: Add additional controller logic for results/cleanup here if needed
+        if (questSuccess) {
+            // WIN: Show success message
+            lcd.clear();
+            lcdPrintCentered(lcd, "", "Mision Cumplida!", "Muy Bien Equipo", "");
+        } else {
+            // LOSE: Show battery drained and shutdown message, then turn off LCD
+            if (!lcdOff) {
+                lcd.clear();
+                lcdPrintCentered(lcd, "", "Bateria Agotada", "Apagando...", "");
+                vTaskDelay(3000 / portTICK_PERIOD_MS);
+                lcd.noBacklight();
+                lcdOff = true;
+            }
+        }
+        // Wait for RF1 short press to restart
         if (!autoEnd && getRfValidMessage(&msg, isValid)) {
             Serial.printf("Received RF%d %s in consequence phase\n", msg.channel + 1, msg.type == LONG_PRESS ? "long" : "short");
             Serial.println("Restarting system...");
             consequenceComplete = true;
         }
-        // CUSTOMIZE: Add hardware/logic to end consequence automatically if needed
         if (autoEnd) {
             // Example: End consequence after a timer or hardware event
             // consequenceComplete = true;
         }
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
+    // Restore LCD for next game
+    lcd.backlight();
     flushGameCommandQueue();
     Serial.println("Consequence phase completed - Restarting system");
     currentGameState = STATE_IDLE;

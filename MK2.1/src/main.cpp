@@ -3,55 +3,60 @@
 #include "functions.h"
 #include "tasks.h"
 
-// --- Global variable definitions ---
-const int rfPins[4] = {23, 4, 15, 25};
+// --- Global variable definitions
+const int sdaPin = 21;
+const int sclPin = 22;
+const int rxPin = 16;
+const int txPin = 17;
+const int rfPins[4] = {15, 23, 25, 4}; //{23, 4, 15, 25}
 const unsigned long LONG_PRESS_MS = 800;
 QueueHandle_t rfEventQueue;
 QueueHandle_t gameCommandQueue;
 ShiftRegister74HC595<2> sr(5, 19, 18);
 HardwareSerial myDFPlayerSerial(2);
 DFRobotDFPlayerMini myDFPlayer;
+int currentDFPlayerVolume = -1;
 PCF8574 pcf(0x20);
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+LiquidCrystal_I2C lcd(0x27, 20, 4); // I2C address 0x27, 20x4 LCD
 volatile unsigned long pressStart[4] = {0, 0, 0, 0};
 volatile bool pressed[4] = {false, false, false, false};
 
+
 // Global variables for game state
 bool systemReady = false;
+bool emergencyRestart = false;
+bool taskCompleted = false;
+bool questSuccess = false;
+GameState currentGameState = STATE_IDLE;
 TaskHandle_t mainTaskHandle = NULL;
 TaskHandle_t preparationTaskHandle = NULL;
 TaskHandle_t questTaskHandle = NULL;
 TaskHandle_t consequenceTaskHandle = NULL;
-GameState currentGameState = STATE_IDLE;
-bool emergencyRestart = false;
-bool taskCompleted = false;
+
+// Quest Variables
+int battery = 15;
+const int pot_latitude_max = 2300; //33
+const int pot_latitude_min = 2000;
+const int pot_longitude_max = 1200; // 69
+const int pot_longitude_min = 900;
 
 void setup() {
-  // Initialize LCD
-
-  lcd.init();
-  //lcd.backlight();
-  lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("System Booting...");
-
   Serial.begin(115200);
   Serial.println("Setup started");
   sr.setAllLow();
-
   gpio_declarations();
 
-  Wire.begin(21, 22); // or your actual SDA, SCL pins
+  Wire.begin(sdaPin, sclPin); // or your actual SDA, SCL pins
   if (!pcf.begin()) {
     Serial.println("PCF8574 not found!");
-    while (1);
+    //while (1);
   } else {
     Serial.println("PCF8574 online.");
     // After successful I2C init
     sr.set(LED_I2C, HIGH);
   }
 
-  myDFPlayerSerial.begin(9600, SERIAL_8N1, 16, 17);
+  myDFPlayerSerial.begin(9600, SERIAL_8N1, rxPin, txPin);
   // Serial.println("DFPlayer Mini test");
   if (!myDFPlayer.begin(myDFPlayerSerial)) {
       Serial.println("Unable to begin DFPlayer Mini:\n"

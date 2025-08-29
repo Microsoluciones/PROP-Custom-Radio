@@ -1,24 +1,8 @@
-## RF Message Handling and Filtering
-
-### Unified Queue and Robust Fetching
-
-All tasks now use a single queue for RF messages. To fetch only valid and fresh messages, use:
-
-```cpp
-bool getRfValidMessage(MainTaskMsg* outMsg, bool (*isValid)(const MainTaskMsg&));
-```
-
-- Skips old messages (older than 2 seconds)
-- Skips unwanted messages (not valid for the current phase)
-- Returns true if a valid message is found, false if timeout
-
-This approach prevents the queue from being blocked and ensures only relevant messages are processed by each phase.
+## Architecture Components
 # PROP Board Ultra - Generic Escape Room Template Architecture
 
 ## Overview
 This is a generic template for escape room projects using ESP32 with a clean task-based architecture and smart message routing.
-
-## Architecture Components
 
 ### 1. Main Task (Coordinator)
 - **Role**: Central coordinator that manages the game flow
@@ -33,8 +17,8 @@ This is a generic template for escape room projects using ESP32 with a clean tas
 The game operates in four distinct states:
 - `STATE_IDLE`: Waiting for initial RF1 short press to start
 - `STATE_PREPARATION`: Setup and configuration phase
-- `STATE_QUEST`: Active game/puzzle phase
-- `STATE_CONSEQUENCE`: Post-game results and cleanup
+- `STATE_QUEST`: Active game/puzzle phase (can end in win or lose)
+- `STATE_CONSEQUENCE`: Post-game results and cleanup (handles win/lose)
 
 ### 3. Emergency Restart System
 - **RF4 (Red Button)**: Emergency kill switch
@@ -58,11 +42,15 @@ The game operates in four distinct states:
 - **Function**: `questTask()`
 - **Purpose**: Main game/puzzle logic
 - **Lifecycle**: Created after preparation, deleted when game ends
+- **Ending**: Can end in two ways:
+  - By user action (RF3 long press): lose scenario (`questSuccess = false`)
+  - By hardware/game logic: win scenario (`questSuccess = true`)
 
 #### Consequence Task
 - **Function**: `consequenceTask()`
 - **Purpose**: End game processing, results, cleanup
 - **Lifecycle**: Created after quest ends, deleted after restart decision
+- **Win/Lose Handling**: Checks `questSuccess` to run win or lose scenario logic (lights, audio, etc)
 
 ### 5. Message Routing System
 - **rfControllerTask**: Smart message router that filters RF button presses based on current game state
@@ -91,6 +79,27 @@ The game operates in four distinct states:
 - `currentGameState`: Current phase of the game (IDLE, PREPARATION, QUEST, CONSEQUENCE)
 - `systemReady`: Flag indicating system readiness
 - `emergencyRestart`: Flag for emergency restart detection
+- `questSuccess`: True if quest completed successfully (win), false if failed (lose)
 - Task handles for dynamic task management
 
 This template provides a clean, safe, and efficient structure for escape room projects with proper emergency handling and race condition prevention.
+
+## RF Message Handling and Filtering
+
+### Unified Queue and Robust Fetching
+
+All tasks now use a single queue for RF messages. To fetch only valid and fresh messages, use:
+
+```cpp
+bool getRfValidMessage(MainTaskMsg* outMsg, bool (*isValid)(const MainTaskMsg&));
+```
+
+- Skips old messages (older than 2 seconds)
+- Skips unwanted messages (not valid for the current phase)
+- Returns true if a valid message is found, false if timeout
+
+This approach prevents the queue from being blocked and ensures only relevant messages are processed by each phase.
+
+## Win/Lose Scenario Handling
+
+The template now supports two ways to end the quest phase and handles win/lose logic in the consequence phase using the `questSuccess` variable.
